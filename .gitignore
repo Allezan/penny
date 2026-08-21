@@ -28,6 +28,9 @@ yarn-error.log*
 .env*.local
 .env
 
+#agent.md
+v1.AGENTS.md
+
 # vercel
 .vercel
 
