@@ -28,8 +28,10 @@ yarn-error.log*
 .env*.local
 .env
 
-#agent.md
+# agent md version history
+AGENTS.md
 v1.AGENTS.md
+v2.AGENTS.md
 
 # vercel
 .vercel
