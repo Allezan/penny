@@ -1,19 +1,19 @@
 import { z } from 'zod';
 
 const envSchema = z.object({
-  TELEGRAM_BOT_TOKEN: z.string().min(1, 'TELEGRAM_BOT_TOKEN is required'),
-  TELEGRAM_WEBHOOK_SECRET: z.string().optional().default('penny_default_webhook_secret'),
-  GOOGLE_SERVICE_ACCOUNT_EMAIL: z.string().email('GOOGLE_SERVICE_ACCOUNT_EMAIL must be a valid email').or(z.string().min(1)),
+  TELEGRAM_BOT_TOKEN: z.string().min(1, 'TELEGRAM_BOT_TOKEN is required').transform((v) => v.trim().replace(/^["']|["']$/g, '')),
+  TELEGRAM_WEBHOOK_SECRET: z.string().optional().default('penny_default_webhook_secret').transform((v) => v.trim().replace(/^["']|["']$/g, '')),
+  GOOGLE_SERVICE_ACCOUNT_EMAIL: z.string().min(1, 'GOOGLE_SERVICE_ACCOUNT_EMAIL is required').transform((v) => v.trim().replace(/^["']|["']$/g, '')),
   GOOGLE_PRIVATE_KEY: z.string().min(1, 'GOOGLE_PRIVATE_KEY is required').transform((val) => {
-    // Normalize multiline private keys passed via env variables with escaped newlines
-    if (val.includes('\\n')) {
-      return val.replace(/\\n/g, '\n');
+    let clean = val.trim().replace(/^["']|["']$/g, '');
+    if (clean.includes('\\n')) {
+      clean = clean.replace(/\\n/g, '\n');
     }
-    return val;
+    return clean;
   }),
-  GOOGLE_SHEETS_ID: z.string().min(1, 'GOOGLE_SHEETS_ID is required'),
+  GOOGLE_SHEETS_ID: z.string().min(1, 'GOOGLE_SHEETS_ID is required').transform((v) => v.trim().replace(/^["']|["']$/g, '')),
   AI_PROVIDER: z.enum(['gemini']).default('gemini'),
-  AI_API_KEY: z.string().min(1, 'AI_API_KEY is required'),
+  AI_API_KEY: z.string().min(1, 'AI_API_KEY is required').transform((v) => v.trim().replace(/^["']|["']$/g, '')),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 });
 

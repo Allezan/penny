@@ -8,9 +8,12 @@ export async function POST(req: NextRequest) {
 
     // Verify Telegram Secret Token Header if configured
     if (env.TELEGRAM_WEBHOOK_SECRET && env.TELEGRAM_WEBHOOK_SECRET !== 'penny_default_webhook_secret') {
-      const incomingSecret = req.headers.get('x-telegram-bot-api-secret-token');
-      if (incomingSecret !== env.TELEGRAM_WEBHOOK_SECRET) {
-        console.warn('Unauthorized webhook request: secret token mismatch.');
+      const incomingSecret = req.headers.get('x-telegram-bot-api-secret-token')?.trim();
+      // Strip any surrounding double or single quotes that may have been pasted into Vercel UI
+      const expectedSecret = env.TELEGRAM_WEBHOOK_SECRET.trim().replace(/^["']|["']$/g, '');
+      
+      if (incomingSecret !== expectedSecret) {
+        console.warn(`Unauthorized webhook request: secret token mismatch. Got "${incomingSecret}", expected "${expectedSecret}"`);
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
     }
