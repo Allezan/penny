@@ -1,6 +1,7 @@
 import { Telegraf } from 'telegraf';
 import { getEnv } from '../config/env';
 import { processReceiptImage, processReceiptText } from '../receipts/processor';
+import { telegramAuthMiddleware } from './auth';
 import {
   formatStartMessage,
   formatErrorMessage,
@@ -9,6 +10,9 @@ import {
 export function createTelegramBot(token?: string): Telegraf {
   const botToken = token || getEnv().TELEGRAM_BOT_TOKEN;
   const bot = new Telegraf(botToken);
+
+  // Centralized Security Middleware: Authorize all updates early
+  bot.use(telegramAuthMiddleware);
 
   // Command /start
   bot.start(async (ctx) => {

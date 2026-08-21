@@ -10,16 +10,18 @@ Penny minimizes the friction of recording personal expenses:
 
 ## 🌟 Product Mission & Architecture
 
-Penny prioritizes **financial accuracy, reliability, simplicity, and maintainability** over feature bloat.
+Penny prioritizes **financial accuracy, reliability, security, simplicity, and maintainability** over feature bloat.
 
 ### Processing Pipeline
 
 ```text
-User takes receipt photo
+User sends photo / text note to Telegram Bot
         ↓
-User sends photo to Telegram Bot
+Webhook Secret Header Verification (401 Unauthorized if invalid)
         ↓
-Penny retrieves highest-resolution image
+Telegram User ID Allowlist Check (Fail-closed: private lock if unauthorized)
+        ↓
+Penny retrieves receipt image / processes expense note
         ↓
 AI Vision extracts structured JSON
         ↓
@@ -32,6 +34,31 @@ Telegram sends confirmation message
 
 ---
 
+## 🔒 Security Hardening
+
+Penny enforces two layers of defense:
+
+1. **Telegram Webhook Secret Verification**: Strictly validates the `x-telegram-bot-api-secret-token` header against `TELEGRAM_WEBHOOK_SECRET`. Invalid or missing secret tokens return `401 Unauthorized`.
+2. **Telegram User ID Allowlist**: Enforces numeric User ID check via Telegraf middleware at the top of the update pipeline. If unauthorized, requests are rejected with `🔒 Penny is currently private.` **before** downloading images, invoking AI, or writing to storage.
+3. **Fail-Closed Security**: If `TELEGRAM_ALLOWED_USER_IDS` is missing, empty, or contains no valid numeric IDs, **nobody is authorized**.
+
+### How to Find Your Telegram User ID
+1. Open Telegram and search for [@userinfobot](https://t.me/userinfobot) or [@raw_data_bot](https://t.me/raw_data_bot).
+2. Send any message to the bot.
+3. Copy the numeric `Id` returned (e.g., `123456789`).
+
+### Configuring Allowed Users
+In your `.env` (or cloud host environment variables):
+```env
+# Single user
+TELEGRAM_ALLOWED_USER_IDS="123456789"
+
+# Multiple users (comma-separated numeric IDs)
+TELEGRAM_ALLOWED_USER_IDS="123456789,987654321"
+```
+
+---
+
 ## 🏗 Architecture Overview
 
 ```text
@@ -40,7 +67,7 @@ src/
 │   ├── api/
 │   │   └── telegram/
 │   │       └── webhook/
-│   │           └── route.ts         # Telegram Webhook API endpoint (POST/GET)
+│   │           └── route.ts         # Telegram Webhook API endpoint with secret verification
 │   ├── layout.tsx                   # Main layout
 │   └── page.tsx                     # System status landing page
 ├── lib/
@@ -57,7 +84,8 @@ src/
 │   │   ├── google-sheets.ts         # Google Sheets API integration & row formatting
 │   │   └── types.ts                 # Storage service interface
 │   ├── telegram/
-│   │   ├── bot.ts                   # Telegraf bot handlers (/start, photo, unsupported)
+│   │   ├── auth.ts                  # Security allowlist & Telegraf auth middleware
+│   │   ├── bot.ts                   # Telegraf bot handlers (/start, photo, text notes)
 │   │   ├── dedupe.ts                # Lightweight duplicate submission protection
 │   │   └── formatter.ts             # Message formatting helpers
 │   └── validation/
@@ -91,6 +119,7 @@ Fill in the required configuration parameters:
 # Telegram Bot Configuration
 TELEGRAM_BOT_TOKEN="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
 TELEGRAM_WEBHOOK_SECRET="your_custom_webhook_secret_token"
+TELEGRAM_ALLOWED_USER_IDS="123456789,987654321"
 
 # Google Sheets Persistence
 GOOGLE_SERVICE_ACCOUNT_EMAIL="penny-bot@your-project.iam.gserviceaccount.com"
@@ -104,12 +133,22 @@ AI_API_KEY="AIzaSyYourGeminiApiKeyHere"
 
 ---
 
-## 🤖 1. Telegram Bot Setup
+## 🤖 1. Telegram Bot & Webhook Setup
 
 1. Open Telegram and search for [@BotFather](https://t.me/BotFather).
 2. Send `/newbot` and follow the prompts to create your bot.
 3. Copy the HTTP API token provided by BotFather into `TELEGRAM_BOT_TOKEN`.
 4. Generate a random secret string for `TELEGRAM_WEBHOOK_SECRET`.
+5. Get your Telegram numeric user ID from [@userinfobot](https://t.me/userinfobot) and set `TELEGRAM_ALLOWED_USER_IDS`.
+6. Register Webhook with Telegram API:
+   ```bash
+   curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "url": "https://<YOUR_DOMAIN>/api/telegram/webhook",
+       "secret_token": "<TELEGRAM_WEBHOOK_SECRET>"
+     }'
+   ```
 
 ---
 
@@ -134,7 +173,7 @@ AI_API_KEY="AIzaSyYourGeminiApiKeyHere"
 
 ---
 
-## 🛠 Local Development
+## 🛠 Local Development & Testing
 
 1. Install dependencies:
    ```bash
@@ -163,33 +202,6 @@ AI_API_KEY="AIzaSyYourGeminiApiKeyHere"
 
 ---
 
-## 🌐 Telegram Webhook Configuration
-
-For local development testing with Telegram webhooks, expose your local Next.js server (port 3000) using `ngrok`:
-
-```bash
-ngrok http 3000
-```
-
-Register your webhook with Telegram Bot API:
-
-```bash
-curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "url": "https://<YOUR_NGROK_DOMAIN>/api/telegram/webhook",
-    "secret_token": "<TELEGRAM_WEBHOOK_SECRET>"
-  }'
-```
-
-Verify webhook status:
-
-```bash
-curl "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/getWebhookInfo"
-```
-
----
-
 ## 🧪 Verification & Production Build
 
 To test and build Penny for production deployment:
@@ -212,9 +224,9 @@ npm run build
 
 ## ❓ Troubleshooting
 
-- **Telegram bot does not respond**: Check `TELEGRAM_BOT_TOKEN` and verify webhook is registered properly using `getWebhookInfo`.
+- **Telegram bot replies `🔒 Penny is currently private.`**: Ensure your numeric Telegram User ID is included in `TELEGRAM_ALLOWED_USER_IDS`.
+- **Webhook returns 401 Unauthorized**: Verify `x-telegram-bot-api-secret-token` matches `TELEGRAM_WEBHOOK_SECRET`.
 - **Google Sheets 403 Forbidden**: Ensure the Google Sheet is shared with the Service Account email address as **Editor**.
-- **Google Sheets Invalid Key format**: Ensure `GOOGLE_PRIVATE_KEY` includes `-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----`. Escaped `\n` in `.env` strings are parsed automatically.
 - **AI extraction errors**: Verify `AI_API_KEY` is valid and has access to Gemini 1.5/2.5 Flash models.
 
 ---

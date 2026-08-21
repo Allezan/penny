@@ -6,17 +6,18 @@ export async function POST(req: NextRequest) {
   try {
     const env = getEnv();
 
-    // Verify Telegram Secret Token Header if configured
+    // Verify Telegram Secret Token Header (Strict Security Layer)
     const configuredSecret = env.TELEGRAM_WEBHOOK_SECRET?.trim().replace(/^["']|["']$/g, '');
     const incomingSecret = req.headers.get('x-telegram-bot-api-secret-token')?.trim();
 
     if (
-      configuredSecret &&
-      configuredSecret !== 'penny_default_webhook_secret' &&
-      incomingSecret &&
+      !configuredSecret ||
+      configuredSecret === 'penny_default_webhook_secret' ||
+      !incomingSecret ||
       incomingSecret !== configuredSecret
     ) {
-      console.warn(`Webhook secret token mismatch: incoming="${incomingSecret}", configured="${configuredSecret}"`);
+      console.warn('Unauthorized webhook request: secret token missing or mismatch.');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await req.json();
@@ -25,8 +26,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid update payload' }, { status: 400 });
     }
 
-    // Process update through Telegraf bot instance
-    // Must be awaited on Vercel Serverless so the function container is not frozen before AI & storage finish
+    // Process update through Telegraf bot instance (awaited for serverless compatibility)
     const bot = getBot();
     await bot.handleUpdate(body);
 

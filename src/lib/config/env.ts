@@ -3,6 +3,7 @@ import { z } from 'zod';
 const envSchema = z.object({
   TELEGRAM_BOT_TOKEN: z.string().min(1, 'TELEGRAM_BOT_TOKEN is required').transform((v) => v.trim().replace(/^["']|["']$/g, '')),
   TELEGRAM_WEBHOOK_SECRET: z.string().optional().default('penny_default_webhook_secret').transform((v) => v.trim().replace(/^["']|["']$/g, '')),
+  TELEGRAM_ALLOWED_USER_IDS: z.string().optional().default('').transform((v) => v.trim().replace(/^["']|["']$/g, '')),
   GOOGLE_SERVICE_ACCOUNT_EMAIL: z.string().min(1, 'GOOGLE_SERVICE_ACCOUNT_EMAIL is required').transform((v) => v.trim().replace(/^["']|["']$/g, '')),
   GOOGLE_PRIVATE_KEY: z.string().min(1, 'GOOGLE_PRIVATE_KEY is required').transform((val) => {
     let clean = val.trim().replace(/^["']|["']$/g, '');
