@@ -25,13 +25,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid update payload' }, { status: 400 });
     }
 
-    // Process update through Telegraf bot instance asynchronously
-    // Returning 200 OK immediately prevents Telegram webhook timeouts and duplicate retries
+    // Process update through Telegraf bot instance
+    // Must be awaited on Vercel Serverless so the function container is not frozen before AI & storage finish
     const bot = getBot();
-    bot.handleUpdate(body).catch((err: unknown) => {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error('Error in background update processing:', message);
-    });
+    await bot.handleUpdate(body);
 
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
